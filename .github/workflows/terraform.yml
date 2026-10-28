@@ -71,21 +71,23 @@ jobs:
       # só satisfaz a validação da variável; em instância existente o plan mostra a senha
       # como alterada (ruído esperado, ignorar).
       TF_VAR_db_password: plan-only-placeholder-not-a-real-password
+      # Credenciais via ambiente: a action configure-aws-credentials falha com token expirado
+      # antes de eu poder tratar "sessão inativa" como "plan não executado".
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_DEFAULT_REGION: us-east-1
     steps:
       - uses: actions/checkout@v4
-      - name: Credenciais da sessão presentes?
+      - name: Sessão AWS ativa?
         id: creds
-        run: echo "present=${{ secrets.AWS_ACCESS_KEY_ID != '' }}" >> "$GITHUB_OUTPUT"
-      - name: Sem credenciais — plan não executado
-        if: steps.creds.outputs.present != 'true'
-        run: echo "::notice::AWS_ACCESS_KEY_ID ausente; terraform plan requer as credenciais STS da sessão AWS Academy."
-      - uses: aws-actions/configure-aws-credentials@v4
-        if: steps.creds.outputs.present == 'true'
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ env.AWS_REGION }}
+        run: |
+          if aws sts get-caller-identity > /dev/null 2>&1; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Sem sessão AWS ativa (credenciais ausentes ou expiradas); terraform plan não executado. Rode set-aws-session-secrets.sh."
+          fi
       - uses: hashicorp/setup-terraform@v3
         if: steps.creds.outputs.present == 'true'
         with:
