@@ -6,8 +6,8 @@
 > workflow `destroy`** (seção [Destroy](#️-destroy)) — antes do `destroy` do `oficina-infra-k8s`.
 
 RDS PostgreSQL gerenciado (Terraform) — Tech Challenge FIAP, Fase 3. Sustenta o requisito "Banco de
-Dados Gerenciado" (R6); a justificativa da escolha do PostgreSQL está em
-[`oficina-app/specs/01-modelagem-banco.md`](https://github.com/victor-duarte-mendonca/oficina-app/blob/main/specs/01-modelagem-banco.md).
+Dados Gerenciado" (R6); a justificativa da escolha do PostgreSQL está na
+[RFC 0002 — Escolha do banco de dados](https://github.com/victor-duarte-mendonca/oficina-app/blob/main/docs/rfc/0002-escolha-do-banco-de-dados.md).
 
 Repositório criado na etapa E0 a partir do histórico de `oficina/infra/rds.tf` do monorepo
 [tech-challenge-fiap](https://github.com/victorduarte31/tech-challenge-fiap). A rede (VPC, subnets, SG
@@ -149,3 +149,11 @@ aws resourcegroupstaggingapi get-resources --tag-filters Key=Project,Values=ofic
 
 Aurora, réplica de leitura, RDS Proxy, Multi-AZ, Performance Insights, rotação automática de senha e
 migrations de schema (são da aplicação, via Flyway).
+
+## Documentação
+
+Documentação de decisão e de arquitetura vive em [`oficina-app`](https://github.com/victor-duarte-mendonca/oficina-app) (atravessa os quatro repositórios):
+
+- [Arquitetura e diagramas (componentes, sequência)](https://github.com/victor-duarte-mendonca/oficina-app/blob/main/docs/arquitetura.md)
+- [ADRs — decisões de arquitetura](https://github.com/victor-duarte-mendonca/oficina-app/blob/main/docs/adr/README.md) · [RFCs](https://github.com/victor-duarte-mendonca/oficina-app/blob/main/docs/rfc/)
+- [Runbook de sessão e custos](https://github.com/victor-duarte-mendonca/oficina-app/blob/main/docs/RUNBOOK.md) · [Roteiro de validação em produção](https://github.com/victor-duarte-mendonca/oficina-app/blob/main/docs/VALIDACAO-PROD.md)
