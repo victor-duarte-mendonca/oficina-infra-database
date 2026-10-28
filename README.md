@@ -98,8 +98,8 @@ Pela pipeline (`.github/workflows/terraform.yml`):
 |---|---|---|
 | `validate` | push e PR | `fmt`, `validate`, `tflint`, `trivy config` |
 | `plan` | PR | `terraform plan` no workspace do alvo e comenta o plano no PR (senha **placeholder**: ver nota) |
-| `apply` | push em `homolog` / `main` | `apply`, aguarda `db-instance-available` e imprime custo/hora e data-hora |
-| `destroy` | `workflow_dispatch` | exige digitar `destroy-<workspace>`; varredura de restos por tag |
+| `apply` | push em `homolog` / `main`; ou *Run workflow* com `confirm` vazio | `apply`, aguarda `db-instance-available` e imprime custo/hora e data-hora |
+| `destroy` | `workflow_dispatch` com `confirm` preenchido | exige digitar `destroy-<workspace>`; varredura de restos por tag |
 
 Nota sobre o `plan`: a senha real é secret de *environment*; usá-lo no `plan` pediria a aprovação do
 ambiente `producao` a cada PR para `main`. Por isso o `plan` usa um valor placeholder e, numa
@@ -138,7 +138,7 @@ Ordem de encerramento (inversa à de criação): `auth-lambda` → `app` → **e
 SG que ele referencia.
 
 Actions → `Terraform` → *Run workflow* → **Use workflow from: `homolog`** (ou `main` para prod) →
-workspace e confirmação `destroy-<workspace>`. Depois confira:
+workspace e confirmação `destroy-<workspace>` (com `confirm` vazio o mesmo disparo faz *apply*). Depois confira:
 
 ```bash
 aws rds describe-db-instances --query "DBInstances[].DBInstanceIdentifier"

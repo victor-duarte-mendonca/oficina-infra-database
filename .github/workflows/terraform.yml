@@ -1,7 +1,8 @@
 name: Terraform
 
 # E3 (spec 07 §7): validate em todo PR/push; plan em PR (comenta o plano); apply por branch
-# (homolog -> workspace hml, main -> workspace prod); destroy manual com confirmação.
+# (homolog -> workspace hml, main -> workspace prod). Disparo manual (Run workflow, "Use workflow from"
+# homolog para hml, main para prod): `confirm` vazio = apply; "destroy-<workspace>" = destroy.
 # Mesma forma da pipeline do oficina-infra-k8s.
 
 on:
@@ -12,14 +13,15 @@ on:
   workflow_dispatch:
     inputs:
       workspace:
-        description: "Workspace a destruir"
+        description: "Workspace alvo (hml com a branch homolog; prod com a branch main)"
         type: choice
         options: [hml, prod]
+        default: hml
         required: true
       confirm:
-        description: 'Digite "destroy-<workspace>" para confirmar (ex.: destroy-hml)'
+        description: 'Vazio = apply. Para destruir, digite "destroy-<workspace>" (ex.: destroy-hml)'
         type: string
-        required: true
+        required: false
 
 permissions:
   contents: read
@@ -69,21 +71,23 @@ jobs:
       # só satisfaz a validação da variável; em instância existente o plan mostra a senha
       # como alterada (ruído esperado, ignorar).
       TF_VAR_db_password: plan-only-placeholder-not-a-real-password
+      # Credenciais via ambiente: a action configure-aws-credentials falha com token expirado
+      # antes de eu poder tratar "sessão inativa" como "plan não executado".
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_DEFAULT_REGION: us-east-1
     steps:
       - uses: actions/checkout@v4
-      - name: Credenciais da sessão presentes?
+      - name: Sessão AWS ativa?
         id: creds
-        run: echo "present=${{ secrets.AWS_ACCESS_KEY_ID != '' }}" >> "$GITHUB_OUTPUT"
-      - name: Sem credenciais — plan não executado
-        if: steps.creds.outputs.present != 'true'
-        run: echo "::notice::AWS_ACCESS_KEY_ID ausente; terraform plan requer as credenciais STS da sessão AWS Academy."
-      - uses: aws-actions/configure-aws-credentials@v4
-        if: steps.creds.outputs.present == 'true'
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ env.AWS_REGION }}
+        run: |
+          if aws sts get-caller-identity > /dev/null 2>&1; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Sem sessão AWS ativa (credenciais ausentes ou expiradas); terraform plan não executado. Rode set-aws-session-secrets.sh."
+          fi
       - uses: hashicorp/setup-terraform@v3
         if: steps.creds.outputs.present == 'true'
         with:
@@ -114,19 +118,31 @@ jobs:
 
   apply:
     name: apply
-    if: github.event_name == 'push'
+    # validate é pulado no disparo manual; !cancelled() impede que o skip propague para o apply.
+    if: >-
+      !cancelled() && needs.validate.result != 'failure' &&
+      (github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && (inputs.confirm == '' || inputs.confirm == null)))
     needs: [validate]
     runs-on: ubuntu-latest
-    # homolog -> hml / homologacao ; main -> prod / producao (required reviewer).
-    environment: ${{ github.ref_name == 'main' && 'producao' || 'homologacao' }}
+    # push: homolog -> hml / homologacao, main -> prod / producao. Manual: workspace escolhido.
+    # producao exige reviewer.
+    environment: ${{ (github.event_name == 'workflow_dispatch' && inputs.workspace == 'prod' || github.event_name == 'push' && github.ref_name == 'main') && 'producao' || 'homologacao' }}
     env:
-      WORKSPACE: ${{ github.ref_name == 'main' && 'prod' || 'hml' }}
+      WORKSPACE: ${{ (github.event_name == 'workflow_dispatch' && inputs.workspace == 'prod' || github.event_name == 'push' && github.ref_name == 'main') && 'prod' || 'hml' }}
       TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
       TF_VAR_db_username: ${{ secrets.DB_USERNAME || 'oficina_admin' }}
     concurrency:
-      group: terraform-state-${{ github.ref_name == 'main' && 'prod' || 'hml' }}
+      group: terraform-state-${{ (github.event_name == 'workflow_dispatch' && inputs.workspace == 'prod' || github.event_name == 'push' && github.ref_name == 'main') && 'prod' || 'hml' }}
       cancel-in-progress: false
     steps:
+      - name: Workspace coerente com a branch
+        run: |
+          expected=$([ "$GITHUB_REF_NAME" = "main" ] && echo prod || echo hml)
+          if [ "$WORKSPACE" != "$expected" ]; then
+            echo "::error::Workspace ${WORKSPACE} exige 'Use workflow from' = $([ "$WORKSPACE" = prod ] && echo main || echo homolog) (atual: ${GITHUB_REF_NAME})."
+            exit 1
+          fi
       - name: Secret DB_PASSWORD definido no environment?
         run: |
           if [ -z "$TF_VAR_db_password" ]; then
@@ -165,7 +181,7 @@ jobs:
 
   destroy:
     name: destroy
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm != '' && inputs.confirm != null
     runs-on: ubuntu-latest
     environment: ${{ inputs.workspace == 'prod' && 'producao' || 'homologacao' }}
     env:
