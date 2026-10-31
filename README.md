@@ -150,6 +150,15 @@ aws resourcegroupstaggingapi get-resources --tag-filters Key=Project,Values=ofic
 Aurora, réplica de leitura, RDS Proxy, Multi-AZ, Performance Insights, rotação automática de senha e
 migrations de schema (são da aplicação, via Flyway).
 
+## APIs (Swagger/Postman)
+
+Este repositório não expõe API própria (é infraestrutura). As APIs do sistema estão documentadas em [`oficina-app`](https://github.com/victor-duarte-mendonca/oficina-app):
+[OpenAPI](https://github.com/victor-duarte-mendonca/oficina-app/blob/main/docs/api/openapi.yaml) · [coleção Postman](https://github.com/victor-duarte-mendonca/oficina-app/blob/main/postman/Oficina-Prod.postman_collection.json).
+
+## URL do deploy ativo
+
+O ambiente roda em AWS Academy (efêmero), então não há URL fixa: os endpoints são publicados no SSM (`/oficina/<env>/...`, ver "Contrato SSM publicado") e no resumo do workflow *Terraform*.
+
 ## Documentação
 
 Documentação de decisão e de arquitetura vive em [`oficina-app`](https://github.com/victor-duarte-mendonca/oficina-app) (atravessa os quatro repositórios):
