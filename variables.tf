@@ -22,6 +22,12 @@ variable "db_name" {
   default     = "oficina_db"
 }
 
+variable "billing_db_name" {
+  description = "Nome do banco criado na instância do Billing Service"
+  type        = string
+  default     = "billing_db"
+}
+
 variable "db_username" {
   description = "Usuário administrador do banco (não é segredo; a senha é)"
   type        = string
